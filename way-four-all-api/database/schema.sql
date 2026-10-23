@@ -4,6 +4,7 @@ CREATE TABLE usuarios (
     email VARCHAR(150) NOT NULL UNIQUE,
     senha_hash VARCHAR(255) NOT NULL,
     perfil VARCHAR(30) NOT NULL DEFAULT 'usuario',
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -76,15 +77,25 @@ CREATE TABLE avaliacoes (
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT INTO categorias (nome) VALUES
-('Restaurante'),
-('Hospital'),
-('Escola'),
-('Mercado'),
-('Hotel'),
-('Parque'),
-('Órgão público'),
-('Espaço cultural');
+INSERT INTO categorias (nome)
+VALUES
+  ('Restaurante'),
+  ('Praça'),
+  ('Banco'),
+  ('Cinema'),
+  ('Laboratório'),
+  ('Clínica médica'),
+  ('Hospital'),
+  ('Biblioteca'),
+  ('Consultório odontológico'),
+  ('Escola'),
+  ('Mercado'),
+  ('Hotel'),
+  ('Parque'),
+  ('Órgão público'),
+  ('Shopping'),
+  ('Unidade Básica de Saúde (UBS)')
+ON CONFLICT (nome) DO NOTHING;
 
 INSERT INTO recursos_acessibilidade (nome, descricao, tipo) VALUES
 (
@@ -122,3 +133,74 @@ INSERT INTO recursos_acessibilidade (nome, descricao, tipo) VALUES
     'Espaço com redução de ruídos, luzes e estímulos sensoriais',
     'sensorial'
 );
+
+CREATE TABLE IF NOT EXISTS solicitacoes_estabelecimentos (
+    id SERIAL PRIMARY KEY,
+
+    usuario_id INTEGER NOT NULL
+        REFERENCES usuarios(id)
+        ON DELETE CASCADE,
+
+    estabelecimento_id INTEGER
+        REFERENCES estabelecimentos(id)
+        ON DELETE SET NULL,
+
+    tipo VARCHAR(20) NOT NULL,
+
+    dados_propostos JSONB,
+
+    motivo TEXT NOT NULL,
+
+    status VARCHAR(20) NOT NULL DEFAULT 'pendente',
+
+    resposta_admin TEXT,
+
+    analisado_por INTEGER
+        REFERENCES usuarios(id)
+        ON DELETE SET NULL,
+
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    analisado_em TIMESTAMP,
+    atualizado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT solicitacao_tipo_valido
+        CHECK (tipo IN ('adicao', 'revisao', 'exclusao')),
+
+    CONSTRAINT solicitacao_status_valido
+        CHECK (
+            status IN (
+                'pendente',
+                'aprovada',
+                'rejeitada',
+                'cancelada'
+            )
+        ),
+
+    CONSTRAINT solicitacao_dados_obrigatorios
+        CHECK (
+            (
+                tipo IN ('adicao', 'revisao')
+                AND dados_propostos IS NOT NULL
+            )
+            OR tipo = 'exclusao'
+        )
+);
+
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_usuario
+ON solicitacoes_estabelecimentos (usuario_id);
+
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_status
+ON solicitacoes_estabelecimentos (status);
+
+CREATE INDEX IF NOT EXISTS idx_solicitacoes_estabelecimento
+ON solicitacoes_estabelecimentos (estabelecimento_id);
+
+CREATE TABLE IF NOT EXISTS favoritos (
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    estabelecimento_id INTEGER NOT NULL REFERENCES estabelecimentos(id) ON DELETE CASCADE,
+    criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (usuario_id, estabelecimento_id)
+);
+CREATE INDEX IF NOT EXISTS idx_avaliacoes_estabelecimento_status ON avaliacoes (estabelecimento_id, status);
+CREATE INDEX IF NOT EXISTS idx_estabelecimentos_status ON estabelecimentos (status);
